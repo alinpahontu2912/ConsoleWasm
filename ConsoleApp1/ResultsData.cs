@@ -16,7 +16,7 @@ namespace WasmBenchmarkResults
         public static JsonResultsData? Load(string path)
         {
             var options = new JsonSerializerOptions { IncludeFields = true };
-            return JsonSerializer.Deserialize<JsonResultsData>(File.ReadAllText(path), options);
+            return JsonSerializer.Deserialize<JsonResultsData>(path, options);
         }
     }
 
