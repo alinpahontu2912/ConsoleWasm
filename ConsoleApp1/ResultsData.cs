@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.IO;
 using System.Linq;
+using System.Text;
 
 namespace WasmBenchmarkResults
 {
@@ -18,6 +19,23 @@ namespace WasmBenchmarkResults
             var options = new JsonSerializerOptions { IncludeFields = true };
             return JsonSerializer.Deserialize<JsonResultsData>(path, options);
         }
+
+        public override string ToString()
+        {
+            StringBuilder stringBuilder = new();
+            foreach (var result in results)
+            {
+                stringBuilder.Append(result.ToString() + '\n');
+            }
+
+            foreach (var pair in minTimes)
+            {
+                stringBuilder.Append(pair.Key + " " + pair.Value + "\n");
+            }
+
+            stringBuilder.Append(timeStamp);
+            return stringBuilder.ToString();
+        }
     }
 
     internal class FlavorData
@@ -29,26 +47,25 @@ namespace WasmBenchmarkResults
 
         public HashSet<string> MeasurementLabels => results.minTimes.Keys.ToHashSet<string>();
 
-        public FlavorData(string path, string flavor)
+        public FlavorData(string path, string flavor, JsonResultsData? jsonResultsData, string gitLogContent)
         {
             runPath = path;
             this.flavor = flavor;
-            results = JsonResultsData.Load(Path.Combine(path, "results.json"));
-            commitTime = LoadGitLog(Path.Combine(path, "git-log.txt"));
+            results = jsonResultsData;
+            commitTime = LoadGitLog(gitLogContent);
         }
 
-        public DateTimeOffset LoadGitLog(string path)
+        public DateTimeOffset LoadGitLog(string text)
         {
-            var lines = File.ReadAllLines(path);
+            var lines = text.Split("\n");
             var regex = new Regex(@"^Date: +(.*)$");
-            string? dateString = null;
             foreach (var line in lines)
             {
                 var match = regex.Match(line);
                 if (!match.Success)
                     continue;
 
-                dateString = match.Groups[1].Value;
+                var dateString = match.Groups[1].Value;
 
                 if (!DateTimeOffset.TryParseExact(dateString, "ddd MMM d HH:mm:ss yyyy K", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var date))
                     continue;
@@ -58,12 +75,17 @@ namespace WasmBenchmarkResults
 
             throw new InvalidDataException("unable to load git log data");
         }
+
+        public override string ToString()
+        {
+            return "\npath: " + runPath + "\nflavor: " + flavor + "\ndata: " + results + "\nCommitTime: " + commitTime;
+        }
+
     }
 
     internal class ResultsData
     {
-        public Dictionary<string, FlavorData> results = new Dictionary<string, FlavorData>();
-        public string baseDirectory;
+        public Dictionary<string, FlavorData> results = new();
     }
 }
 

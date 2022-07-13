@@ -3,41 +3,69 @@ using System.Text.Json.Nodes;
 using System.Text;
 using System.Linq;
 using System;
+using System.Runtime.InteropServices.ComTypes;
 using WasmBenchmarkResults;
 
 class Test
 {
+    private static string getFlavor(string line)
+    {
+        var words = line.Split("/");
+        StringBuilder stringBuilder = new();
+        for (var i = 2; i < words.Length - 1; i++)
+        {
+            stringBuilder.Append(words[i] + ".");
+        }
+
+        return stringBuilder.ToString().Remove(stringBuilder.Length - 1);
+    }
+
     static async Task Main(string[] args)
     {
-        HttpClient client = new HttpClient();
-        List<JsonResultsData> jsonResultsDatas = new();
+        var client = new HttpClient();
+        List<JsonResultsData> jsonResultsData = new();
+        List<FlavorData> flavorDatas = new();
+        SortedDictionary<DateTimeOffset, ResultsData> timedResults = new();
         client.DefaultRequestHeaders.Add("User-Agent", "my-app");
-        string main = "https://raw.githubusercontent.com/radekdoulik/WasmPerformanceMeasurements/main/";
-        HttpResponseMessage response = await client.GetAsync(main + "measurements/jsonDataFiles.txt");
+        var main = "https://raw.githubusercontent.com/radekdoulik/WasmPerformanceMeasurements/main/";
+        var response = await client.GetAsync(main + "measurements/jsonDataFiles.txt");
         if (response.StatusCode != HttpStatusCode.OK)
         {
-            throw new Exception("HTTP request failed with status code " + response.StatusCode + "and message " + response.ReasonPhrase);
+            throw new Exception("HTTP request failed with status code " + response.StatusCode + " and message " + response.ReasonPhrase);
         }
         var text = await response.Content.ReadAsStringAsync();
         var lines = text.Split("\n");
-        for (int i = 0; i < lines.Length - 1; i++)
+        for (var i = 0; i < lines.Length - 1; i++)
         {
-            string? fileUrl = lines[i];
+            var fileUrl = lines[i];
             response = await client.GetAsync(main + fileUrl);
             if (response.StatusCode != HttpStatusCode.OK)
             {
-                throw new Exception("HTTP request failed with status code " + response.StatusCode + "and message " + response.ReasonPhrase);
+                throw new Exception("HTTP request failed with status code " + response.StatusCode + " and message " + response.ReasonPhrase);
             }
-            string exam = response.Content.ReadAsStringAsync().Result;
-            JsonResultsData? test = JsonResultsData.Load(exam);
-            jsonResultsDatas.Add(test);
-        }
-        jsonResultsDatas.OrderBy(a => a.timeStamp);
-        foreach (var item in jsonResultsDatas)
-        {
-            Console.WriteLine(item.timeStamp);
-        }
+            var content = response.Content.ReadAsStringAsync().Result;
+            var deserializedCont = JsonResultsData.Load(content);
+            var logUrl = lines[i].Replace("results.json", "git-log.txt");
+            response = await client.GetAsync(main + logUrl);
+            if (response.StatusCode != HttpStatusCode.OK)
+            {
+                throw new Exception("HTTP request failed with status code " + response.StatusCode + " and message " + response.ReasonPhrase);
+            }
+            content = response.Content.ReadAsStringAsync().Result;
+            
+            var flavorData = new FlavorData(main + fileUrl, getFlavor(fileUrl), deserializedCont, content);
+            timedResults.Add(flavorData.commitTime, new ResultsData());
+            timedResults[flavorData.commitTime].results[flavorData.flavor] = flavorData;
 
+        }
+        foreach (var item in timedResults)
+        {
+            Console.WriteLine(item.Key);
+            foreach (var elem in item.Value.results.Keys) 
+            {
+                Console.WriteLine(elem + "\n" + item.Value.results[elem]);
+            }
+        }
     }
 
 }
