@@ -52,16 +52,25 @@ class Test
                 throw new Exception("HTTP request failed with status code " + response.StatusCode + " and message " + response.ReasonPhrase);
             }
             content = response.Content.ReadAsStringAsync().Result;
-            
             var flavorData = new FlavorData(main + fileUrl, getFlavor(fileUrl), deserializedCont, content);
-            timedResults.Add(flavorData.commitTime, new ResultsData());
-            timedResults[flavorData.commitTime].results[flavorData.flavor] = flavorData;
+            ResultsData resultsData;
+            if (timedResults.ContainsKey(flavorData.commitTime))
+            {
+                resultsData = timedResults[flavorData.commitTime];
+            }
+            else
+            {
+                resultsData = new ResultsData();
+                timedResults[flavorData.commitTime] = resultsData;
+            }
+
+            resultsData.results[flavorData.flavor] = flavorData;
 
         }
         foreach (var item in timedResults)
         {
             Console.WriteLine(item.Key);
-            foreach (var elem in item.Value.results.Keys) 
+            foreach (var elem in item.Value.results.Keys)
             {
                 Console.WriteLine(elem + "\n" + item.Value.results[elem]);
             }
