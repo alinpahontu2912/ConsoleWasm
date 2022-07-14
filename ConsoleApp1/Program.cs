@@ -5,7 +5,7 @@ using WasmBenchmarkResults;
 class Program
 {
     readonly static string main = "https://raw.githubusercontent.com/radekdoulik/WasmPerformanceMeasurements/main/";
-    private static string getFlavor(string line)
+    public static string getFlavor(string line)
     {
         var words = line.Split("/");
         StringBuilder stringBuilder = new();

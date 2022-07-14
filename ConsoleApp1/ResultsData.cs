@@ -53,12 +53,12 @@ namespace WasmBenchmarkResults
 
         public HashSet<string> MeasurementLabels => results.minTimes.Keys.ToHashSet<string>();
 
-        public FlavorData(string orgin, string flavor)
+        public FlavorData(string origin, string flavor)
         {
-            origin = orgin;
+            this.origin = origin;
             this.flavor = flavor;
-            results = JsonResultsData.Load(Path.Combine(orgin, "results.json"));
-            commitTime = LoadGitLog(File.ReadAllText(Path.Combine(orgin, "git-log.txt")));
+            results = JsonResultsData.Load(Path.Combine(origin, "results.json"));
+            commitTime = LoadGitLog(File.ReadAllText(Path.Combine(origin, "git-log.txt")));
         }
 
         public FlavorData(string origin, string flavor, string jsonResultsData, string gitLogContent)
