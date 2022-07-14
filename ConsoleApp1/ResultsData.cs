@@ -1,9 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.RegularExpressions;
-using System.IO;
-using System.Linq;
 using System.Text;
 
 namespace WasmBenchmarkResults
@@ -13,11 +9,21 @@ namespace WasmBenchmarkResults
         public List<BenchTask.Result> results;
         public Dictionary<string, double> minTimes;
         public DateTime timeStamp;
+        public string origin;
+
+        public static JsonResultsData? Load(string origin, string json)
+        {
+            var options = new JsonSerializerOptions { IncludeFields = true };
+            var data = JsonSerializer.Deserialize<JsonResultsData>(json, options);
+            if (data == null)
+                throw new Exception("Unable to deserialize");
+            data.origin = origin;
+            return data;
+        }
 
         public static JsonResultsData? Load(string path)
         {
-            var options = new JsonSerializerOptions { IncludeFields = true };
-            return JsonSerializer.Deserialize<JsonResultsData>(path, options);
+            return Load(path, File.ReadAllText(path));
         }
 
         public override string ToString()
@@ -41,23 +47,31 @@ namespace WasmBenchmarkResults
     internal class FlavorData
     {
         public DateTimeOffset commitTime;
-        public string runPath;
+        public string origin;
         public string flavor;
         public JsonResultsData results;
 
         public HashSet<string> MeasurementLabels => results.minTimes.Keys.ToHashSet<string>();
 
-        public FlavorData(string path, string flavor, JsonResultsData? jsonResultsData, string gitLogContent)
+        public FlavorData(string orgin, string flavor)
         {
-            runPath = path;
+            origin = orgin;
             this.flavor = flavor;
-            results = jsonResultsData;
+            results = JsonResultsData.Load(Path.Combine(orgin, "results.json"));
+            commitTime = LoadGitLog(File.ReadAllText(Path.Combine(orgin, "git-log.txt")));
+        }
+
+        public FlavorData(string origin, string flavor, string jsonResultsData, string gitLogContent)
+        {
+            this.origin = origin;
+            this.flavor = flavor;
+            results = JsonResultsData.Load(origin, jsonResultsData);
             commitTime = LoadGitLog(gitLogContent);
         }
 
-        public DateTimeOffset LoadGitLog(string text)
+        public DateTimeOffset LoadGitLog(string content)
         {
-            var lines = text.Split("\n");
+            var lines = content.Split("\n");
             var regex = new Regex(@"^Date: +(.*)$");
             foreach (var line in lines)
             {
@@ -78,7 +92,7 @@ namespace WasmBenchmarkResults
 
         public override string ToString()
         {
-            return "\npath: " + runPath + "\nflavor: " + flavor + "\ndata: " + results + "\nCommitTime: " + commitTime;
+            return "\npath: " + origin + "\nflavor: " + flavor + "\ndata: " + results + "\nCommitTime: " + commitTime;
         }
 
     }

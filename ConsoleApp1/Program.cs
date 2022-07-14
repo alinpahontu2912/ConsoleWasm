@@ -1,13 +1,10 @@
 ﻿using System.Net;
-using System.Text.Json.Nodes;
 using System.Text;
-using System.Linq;
-using System;
-using System.Runtime.InteropServices.ComTypes;
 using WasmBenchmarkResults;
 
-class Test
+class Program
 {
+    readonly static string main = "https://raw.githubusercontent.com/radekdoulik/WasmPerformanceMeasurements/main/";
     private static string getFlavor(string line)
     {
         var words = line.Split("/");
@@ -22,50 +19,26 @@ class Test
 
     static async Task Main(string[] args)
     {
-        var client = new HttpClient();
-        List<JsonResultsData> jsonResultsData = new();
-        List<FlavorData> flavorDatas = new();
+        QuerySolver querySolver = new();
         SortedDictionary<DateTimeOffset, ResultsData> timedResults = new();
-        client.DefaultRequestHeaders.Add("User-Agent", "my-app");
-        var main = "https://raw.githubusercontent.com/radekdoulik/WasmPerformanceMeasurements/main/";
-        var response = await client.GetAsync(main + "measurements/jsonDataFiles.txt");
-        if (response.StatusCode != HttpStatusCode.OK)
-        {
-            throw new Exception("HTTP request failed with status code " + response.StatusCode + " and message " + response.ReasonPhrase);
-        }
-        var text = await response.Content.ReadAsStringAsync();
+        var text = querySolver.solveQuery(main + "measurements/jsonDataFiles.txt").Result;
         var lines = text.Split("\n");
         for (var i = 0; i < lines.Length - 1; i++)
         {
             var fileUrl = lines[i];
-            response = await client.GetAsync(main + fileUrl);
-            if (response.StatusCode != HttpStatusCode.OK)
-            {
-                throw new Exception("HTTP request failed with status code " + response.StatusCode + " and message " + response.ReasonPhrase);
-            }
-            var content = response.Content.ReadAsStringAsync().Result;
-            var deserializedCont = JsonResultsData.Load(content);
+            var json = querySolver.solveQuery(main + fileUrl).Result;
             var logUrl = lines[i].Replace("results.json", "git-log.txt");
-            response = await client.GetAsync(main + logUrl);
-            if (response.StatusCode != HttpStatusCode.OK)
-            {
-                throw new Exception("HTTP request failed with status code " + response.StatusCode + " and message " + response.ReasonPhrase);
-            }
-            content = response.Content.ReadAsStringAsync().Result;
-            var flavorData = new FlavorData(main + fileUrl, getFlavor(fileUrl), deserializedCont, content);
+            var content = querySolver.solveQuery(main + logUrl).Result;
+            var flavorData = new FlavorData(main + fileUrl, getFlavor(fileUrl), json, content);
             ResultsData resultsData;
             if (timedResults.ContainsKey(flavorData.commitTime))
-            {
                 resultsData = timedResults[flavorData.commitTime];
-            }
             else
             {
                 resultsData = new ResultsData();
                 timedResults[flavorData.commitTime] = resultsData;
             }
-
             resultsData.results[flavorData.flavor] = flavorData;
-
         }
         foreach (var item in timedResults)
         {
@@ -76,5 +49,25 @@ class Test
             }
         }
     }
+    internal class QuerySolver
+    {
+        public HttpClient client;
+        public QuerySolver()
+        {
+            client = new();
+            client.DefaultRequestHeaders.Add("User-Agent", "my-app");
+        }
+
+        public async Task<string> solveQuery(string url)
+        {
+            var response = await client.GetAsync(url);
+            if (response.StatusCode != HttpStatusCode.OK)
+                throw new Exception("HTTP request failed with status code " + response.StatusCode + " and message " + response.ReasonPhrase);
+            var text = await response.Content.ReadAsStringAsync();
+            return text;
+        }
+    }
+
+
 
 }
